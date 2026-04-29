@@ -82,7 +82,7 @@ AWS Resource Groups provide a tag-based view of all resources belonging to this 
    - Use the parameters below:
 
    | Parameter | Value |
-   | ----------- | ------- |
+   | --- | --- |
    | Group type | Tag based |
    | **Grouping criteria** | |
    | Resource types | All supported resource types (default) |
@@ -105,7 +105,7 @@ AWS Resource Groups provide a tag-based view of all resources belonging to this 
 ### Troubleshooting
 
 | Issue | Solution |
-|-------|----------|
+| --- | --- |
 | "Access denied" error | Ensure your IAM user/role has `resource-groups:CreateGroup` permission |
 | Region selector disabled | Some accounts require you to opt-in to `ca-central-1` — contact admin |
 | Group shows no resources | Resources appear only after they are created with the matching tag |
@@ -128,7 +128,7 @@ The Virtual Private Cloud (VPC) provides the private IP address space for all AW
 3. **VPC settings:** use the parameters below.
 
    | Parameter | Value |
-   |-----------|-------|
+   | --- | --- |
    | Resources to create | VPC only |
    | Name tag | `Redwood-AWS-VPC` |
    | IPv4 CIDR block | IPv4 CIDR manual input |
@@ -142,7 +142,7 @@ The Virtual Private Cloud (VPC) provides the private IP address space for all AW
 4. **Additional tags:** click **Add tag** and add the following (in addition to the `Name` tag already present):
 
    | Tag Key | Tag Value |
-   |---------|-----------|
+   | --- | --- |
    | `Project` | `Redwood-AWS-101` |
 
 5. Click **Create VPC**
@@ -175,7 +175,7 @@ The Virtual Private Cloud (VPC) provides the private IP address space for all AW
 ### Troubleshooting
 
 | Issue | Solution |
-|-------|----------|
+| --- | --- |
 | CIDR block is invalid | Verify format: `10.100.0.0/16` (no spaces, correct slash) |
 | Overlapping CIDR error | Check for existing VPCs using the same range in this account |
 | VPC stuck in "pending" | Refresh the page — AWS usually provisions the VPC in under 5 seconds |
@@ -192,19 +192,19 @@ The External subnet will host FortiGate's `port1` Elastic Network Interface (ENI
 2. **Create subnet:** click **Create subnet** and use the parameters below.
 
    | Parameter | Value |
-   |-----------|-------|
+   | --- | --- |
    | VPC ID | `Redwood-AWS-VPC` |
    | Subnet name | `External-Subnet` |
    | Availability Zone | `ca-central-1a` |
    | IPv4 subnet CIDR block | `10.100.1.0/24` |
 
-   > [!IMPORTANT]
-   > Both subnets in this lab MUST be in the same Availability Zone (`ca-central-1a`). Unlike Azure, AWS subnets are AZ-scoped — a FortiGate ENI can only attach to subnets in its own AZ. Also note that AWS reserves 5 IPs per `/24` subnet (`.0`, `.1`, `.2`, `.3`, and `.255`), leaving 251 usable.
+> [!IMPORTANT]
+> Both subnets in this lab MUST be in the same Availability Zone (`ca-central-1a`). Unlike Azure, AWS subnets are AZ-scoped — a FortiGate ENI can only attach to subnets in its own AZ. Also note that AWS reserves 5 IPs per `/24` subnet (`.0`, `.1`, `.2`, `.3`, and `.255`), leaving 251 usable.
 
 3. **Tags:** add the standard tags.
 
    | Tag Key | Tag Value |
-   |---------|-----------|
+   | --- | --- |
    | `Project` | `Redwood-AWS-101` |
 
 4. Click **Create subnet**
@@ -237,7 +237,7 @@ The Internal subnet hosts FortiGate's `port2` ENI **and** the protected workload
 1. **Still in Subnets:** click **Create subnet** again and use the parameters below.
 
    | Parameter | Value |
-   |-----------|-------|
+   | --- | --- |
    | VPC ID | `Redwood-AWS-VPC` |
    | Subnet name | `Internal-Subnet` |
    | Availability Zone | `ca-central-1a` (same AZ as External) |
@@ -246,7 +246,7 @@ The Internal subnet hosts FortiGate's `port2` ENI **and** the protected workload
 2. **Tags:** add the standard tags.
 
    | Tag Key | Tag Value |
-   |---------|-----------|
+   | --- | --- |
    | `Project` | `Redwood-AWS-101` |
 
 3. Click **Create subnet**
@@ -314,13 +314,13 @@ AWS VPCs have no implicit internet connectivity. Public IP addresses on an EC2 i
 2. **Create the Internet Gateway:** click **Create internet gateway** and use the parameters below.
 
    | Parameter | Value |
-   |-----------|-------|
+   | --- | --- |
    | Name tag | `Redwood-AWS-IGW` |
 
    Add the standard tags:
 
    | Tag Key | Tag Value |
-   |---------|-----------|
+   | --- | --- |
    | `Project` | `Redwood-AWS-101` |
 
    Click **Create internet gateway**.
@@ -328,7 +328,7 @@ AWS VPCs have no implicit internet connectivity. Public IP addresses on an EC2 i
 3. **Attach the IGW to the VPC:** on the new IGW's detail page, click **Actions → Attach to VPC** and use the parameter below.
 
    | Parameter | Value |
-   | ----------- | ------- |
+   | --- | --- |
    | Available VPCs | `Redwood-AWS-VPC` |
 
    Click **Attach internet gateway**.
@@ -356,10 +356,10 @@ This route table makes `External-Subnet` a true public subnet by sending `0.0.0.
    - Click **Create route table** and use the parameters below.
 
      | Parameter | Value |
-     |-----------|-------|
+     | --- | --- |
      | Name | `Redwood-AWS-RT-External` |
      | VPC | `Redwood-AWS-VPC` |
-     | Tags |
+     | Tags | |
      | `Project` | `Redwood-AWS-101` |
 
    - Click **Create route table**
