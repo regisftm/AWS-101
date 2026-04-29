@@ -270,7 +270,7 @@ The Internal subnet hosts FortiGate's `port2` ENI **and** the protected workload
 > In Lab 2, `10.100.2.4` must be assigned as a **static** private IP on the FortiGate `port2` ENI — not a DHCP lease. The Internal subnet's route table will point `0.0.0.0/0` at this exact IP, so it cannot be allowed to change.
 
 <details>
-<summary>> **Why isn't there a separate "Protected" subnet (and how this differs from Azure)?**</summary>
+<summary> **Why isn't there a separate "Protected" subnet (and how this differs from Azure)?**</summary>
 
 Fortinet's official single-FortiGate-VM reference architecture for AWS uses **two subnets**: External (port1) and Internal (port2 + workloads share this subnet).
 
@@ -287,7 +287,7 @@ Two EC2 instances sitting in the **same** AWS subnet communicate directly via th
 This is an **AWS fabric constraint**, not a FortiGate limitation. Note the contrast with Azure, where a User-Defined Route (UDR) **can** override the intra-subnet system route and force same-subnet traffic through an NVA.
 
 Production patterns that **do** inspect east-west on AWS — per-workload subnets with FortiGate `port2` as next-hop (using AWS "more specific routing"), AWS Gateway Load Balancer (GWLB) with GWLB endpoints, or a Transit Gateway hub-and-spoke through a centralized Inspection VPC — are covered in **AWS-102** and **AWS-201**.
-<details>
+</details>
 
 > [!NOTE]
 > **Why isn't there a separate "Protected" subnet (and how this differs from Azure)?**
