@@ -136,8 +136,8 @@ The Virtual Private Cloud (VPC) provides the private IP address space for all AW
    | IPv6 CIDR block | No IPv6 CIDR block |
    | Tenancy | Default |
 
-   > [!IMPORTANT]
-   > Do NOT use **VPC and more** — we want to build subnets explicitly in the following steps for better control. The **Name tag** field automatically creates a `Name` tag on the VPC.
+> [!IMPORTANT]
+> Do NOT use **VPC and more** — we want to build subnets explicitly in the following steps for better control. The **Name tag** field automatically creates a `Name` tag on the VPC.
 
 4. **Additional tags:** click **Add tag** and add the following (in addition to the `Name` tag already present):
 
