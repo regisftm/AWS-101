@@ -289,24 +289,6 @@ This is an **AWS fabric constraint**, not a FortiGate limitation. Note the contr
 Production patterns that **do** inspect east-west on AWS — per-workload subnets with FortiGate `port2` as next-hop (using AWS "more specific routing"), AWS Gateway Load Balancer (GWLB) with GWLB endpoints, or a Transit Gateway hub-and-spoke through a centralized Inspection VPC — are covered in **AWS-102** and **AWS-201**.
 </details>
 
-> [!NOTE]
-> **Why isn't there a separate "Protected" subnet (and how this differs from Azure)?**
->
-> Fortinet's official single-FortiGate-VM reference architecture for AWS uses **two subnets**: External (port1) and Internal (port2 + workloads share this subnet).
->
-> This is **different from Azure**, where Fortinet's reference design (and the matching AZ-101 workshop) uses **three subnets**: External + Internal (port2 only, transit) + Protected (workloads). On Azure, a User-Defined Route in the Protected subnet steers workload traffic to FortiGate's port2 in the Internal subnet, and Azure UDRs can override even intra-subnet routes — making subnet separation cleanly enforceable.
->
-> On AWS, the equivalent 3-subnet split would not actually improve security in this single-VM lab, because AWS subnet route tables only apply to traffic *leaving* the subnet — FortiGate's own egress (FortiGuard, updates) uses its internal routing table out `port1` and creates no forwarding loop when `port2` and workloads share `Internal-Subnet`. A dedicated "Transit" subnet on AWS only earns its keep in HA, multi-AZ, GWLB, or hub-and-spoke designs (covered in AWS-102 / AWS-201).
-
-> [!IMPORTANT]
-> **East-west traffic inside `Internal-Subnet` is NOT inspected by this lab's design.**
->
-> Two EC2 instances sitting in the **same** AWS subnet communicate directly via the VPC's implicit `local` route. AWS does not allow that route to be overridden for intra-subnet traffic — no subnet route table entry can intercept traffic between two ENIs in the same subnet. So if you add a second workload to `Internal-Subnet`, traffic between it and the test VM will bypass FortiGate entirely.
->
-> This is an **AWS fabric constraint**, not a FortiGate limitation. Note the contrast with Azure, where a User-Defined Route (UDR) **can** override the intra-subnet system route and force same-subnet traffic through an NVA.
->
-> Production patterns that **do** inspect east-west on AWS — per-workload subnets with FortiGate `port2` as next-hop (using AWS "more specific routing"), AWS Gateway Load Balancer (GWLB) with GWLB endpoints, or a Transit Gateway hub-and-spoke through a centralized Inspection VPC — are covered in **AWS-102** and **AWS-201**.
-
 **Traffic Flow (this lab):**
 
 ```text
