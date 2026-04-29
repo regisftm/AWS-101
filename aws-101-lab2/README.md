@@ -606,7 +606,7 @@ Current state after Lab 2:
 
 ### Next Steps
 
-Ready for **Lab 3 — Security Policies & Traffic Testing**.
+Ready for [***Lab 3 — Security Policies & Traffic Testing***](/aws-101-lab3/README.md)
 
 In Lab 3 you will:
 

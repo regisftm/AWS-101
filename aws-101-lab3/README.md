@@ -593,7 +593,7 @@ Outbound flow (test VM → Internet):
 
 ### Next Steps
 
-Ready for **Lab 4 — Site-to-Site VPN Configuration**.
+Ready for [***Lab 4 — Site-to-Site VPN Configuration***](/aws-101-lab4/README.md)
 
 In Lab 4 you will:
 
