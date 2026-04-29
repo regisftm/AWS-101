@@ -270,7 +270,7 @@ The Internal subnet hosts FortiGate's `port2` ENI **and** the protected workload
 > In Lab 2, `10.100.2.4` must be assigned as a **static** private IP on the FortiGate `port2` ENI — not a DHCP lease. The Internal subnet's route table will point `0.0.0.0/0` at this exact IP, so it cannot be allowed to change.
 
 <details>
-<summary> **Why isn't there a separate "Protected" subnet (and how this differs from Azure)?**</summary>
+<summary> <b>Why isn't there a separate "Protected" subnet (and how this differs from Azure)?</b></summary>
 
 Fortinet's official single-FortiGate-VM reference architecture for AWS uses **two subnets**: External (port1) and Internal (port2 + workloads share this subnet).
 
@@ -280,7 +280,7 @@ On AWS, the equivalent 3-subnet split would not actually improve security in thi
 </details>
 
 <details>
-<summary> **East-west traffic inside `Internal-Subnet` is NOT inspected by this lab's design.**</summary>
+<summary><b>East-west traffic inside `Internal-Subnet` is NOT inspected by this lab's design.</b></summary>
 
 Two EC2 instances sitting in the **same** AWS subnet communicate directly via the VPC's implicit `local` route. AWS does not allow that route to be overridden for intra-subnet traffic — no subnet route table entry can intercept traffic between two ENIs in the same subnet. So if you add a second workload to `Internal-Subnet`, traffic between it and the test VM will bypass FortiGate entirely.
 
