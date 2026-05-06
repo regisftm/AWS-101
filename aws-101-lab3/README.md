@@ -4,16 +4,16 @@
 
 ### Objective
 
-Deploy a test workload (EC2 instance) into `Internal-Subnet`, then configure FortiGate firewall policies and Virtual IPs (VIPs) so that:
+Deploy a test workload (EC2 instance) into `Private-Subnet`, then configure FortiGate firewall policies and Virtual IPs (VIPs) so that:
 
 - Inbound SSH and HTTP traffic from the Internet reaches the workload through FortiGate
 - Outbound traffic from the workload to the Internet is inspected and source-NAT'd to FortiGate's Elastic IP
 
-By the end of this lab, you'll have proven end-to-end inspection in both directions, watched the sessions appear in **Log & Report → Forward Traffic** and **FortiView**, and demonstrated that nothing reaches or leaves `Internal-Subnet` without FortiGate's permission.
+By the end of this lab, you'll have proven end-to-end inspection in both directions, watched the sessions appear in **Log & Report → Forward Traffic** and **FortiView**, and demonstrated that nothing reaches or leaves `Private-Subnet` without FortiGate's permission.
 
 ### What You'll Build
 
-- A test EC2 instance (`Redwood-AWS-TestVM`) running Amazon Linux 2023 in `Internal-Subnet` at the static private IP `10.100.2.10`, with **no public IP**
+- A test EC2 instance (`Redwood-AWS-TestVM`) running Ubuntu Server 24.04 LTS in `Private-Subnet` at the static private IP `10.100.2.10`, with **no public IP**
 - A FortiGate **address object** (`TESTVM-INTERNAL`) representing the workload
 - Two FortiGate **Virtual IPs** mapping FortiGate's Elastic IP to the test VM:
   - `TESTVM-INTERNAL-VIP-SSH` — external port `2222` → internal port `22`
@@ -34,12 +34,12 @@ By the end of this lab, you'll have proven end-to-end inspection in both directi
                       │  Redwood-AWS-IGW   │
                       └──────────┬─────────┘
                                  │
-                      (RT-External: 0/0 → IGW)
+                      (RT-Public: 0/0 → IGW)
                                  │
 ┌────────────────────────────────┴───────────────────────────────────┐
 │  Redwood-AWS-VPC  (10.100.0.0/16)  —  ca-central-1a                │
 │                                                                    │
-│  ┌─────────────── External-Subnet (10.100.1.0/24) ──────────────┐  │
+│  ┌─────────────── Public-Subnet (10.100.1.0/24) ──────────────┐  │
 │  │                                                              │  │
 │  │   Redwood-AWS-FGT  port1 ENI  ──── EIP (15.x.x.x)            │  │
 │  │      ▲                                                       │  │
@@ -48,7 +48,7 @@ By the end of this lab, you'll have proven end-to-end inspection in both directi
 │  │      │                                                       │  │
 │  └──────┼───────────────────────────────────────────────────────┘  │
 │         │                                                          │
-│  ┌──────┼─────── Internal-Subnet (10.100.2.0/24) ──────────────┐   │
+│  ┌──────┼─────── Private-Subnet (10.100.2.0/24) ──────────────┐   │
 │  │      │                                                      │   │
 │  │   Redwood-AWS-FGT  port2 ENI  10.100.2.4 (static)           │   │
 │  │      ▲                                                      │   │
@@ -59,7 +59,7 @@ By the end of this lab, you'll have proven end-to-end inspection in both directi
 │  │          │  10.100.2.10  (no EIP)     │                     │   │
 │  │          └────────────────────────────┘                     │   │
 │  │                                                             │   │
-│  │  (RT-Internal: 0.0.0.0/0 → port2 ENI)                       │   │
+│  │  (RT-Private: 0.0.0.0/0 → port2 ENI)                       │   │
 │  └─────────────────────────────────────────────────────────────┘   │
 └────────────────────────────────────────────────────────────────────┘
 ```
@@ -72,7 +72,7 @@ Redwood Industries has approved the AWS landing zone built in Labs 1 and 2 and i
 
 ## Prerequisites
 
-- Lab 1 and Lab 2 completed (VPC, subnets, IGW, External RT, FortiGate VM with port1+port2 ENIs, FortiFlex licence valid, `Redwood-AWS-RT-Internal` associated with `Internal-Subnet`)
+- Lab 1 and Lab 2 completed (VPC, subnets, IGW, Public RT, FortiGate VM with port1+port2 ENIs, FortiFlex licence valid, `Redwood-AWS-RT-Private` associated with `Private-Subnet`)
 - The Elastic IP from Lab 2 — you will use it as the SSH endpoint for the test workload
 - Your existing `Redwood-AWS-FGT-Key` key pair (created in Lab 2) — the test VM will use the same key
 - An SSH client (macOS / Linux / WSL terminal, or PuTTY on Windows)
@@ -88,7 +88,7 @@ Redwood Industries has approved the AWS landing zone built in Labs 1 and 2 and i
 
 ## Step 1: Launch the Test EC2 Instance
 
-You will launch a small Amazon Linux 2023 instance directly into `Internal-Subnet`. The `Redwood-AWS-RT-Internal` route table from Lab 2 ensures any egress from this instance is automatically steered to FortiGate's `port2`.
+You will launch a small Ubuntu Server 24.04 LTS instance directly into `Private-Subnet`. The `Redwood-AWS-RT-Private` route table from Lab 2 ensures any egress from this instance is automatically steered to FortiGate's `port2`.
 
 1. **Open the EC2 launch wizard:**
    - In the top search bar, type `EC2` and click **EC2** (the service result)
@@ -114,7 +114,7 @@ You will launch a small Amazon Linux 2023 instance directly into `Internal-Subne
 
      | Parameter | Value |
      | --- | --- |
-     | Instance type | `t3.micro` (2 vCPU, 1 GiB, free-tier eligible) |
+     | Instance type | `t2.micro` (1 vCPU, 1 GiB, free-tier eligible) |
 
 5. **Key pair (login):**
    - In the **Key pair name — required** dropdown, select `Redwood-AWS-FGT-Key` (created in Lab 2)
@@ -126,11 +126,11 @@ You will launch a small Amazon Linux 2023 instance directly into `Internal-Subne
      | Parameter | Value |
      | --- | --- |
      | VPC | `Redwood-AWS-VPC` |
-     | Subnet | `Internal-Subnet` |
+     | Subnet | `Private-Subnet` |
      | Auto-assign public IP | **Disable** |
      | Firewall (security groups) | **Create security group** |
      | Security group name | `Redwood-AWS-TestVM-SG` |
-     | Description | `Internal access only - inbound from FortiGate port2 ENI` |
+     | Description | `Private access only - inbound from FortiGate port2 ENI` |
 
    - In the **Inbound security group rules** section, replace the default rule with the two rules below.
 
@@ -159,8 +159,8 @@ You will launch a small Amazon Linux 2023 instance directly into `Internal-Subne
 ### Validation
 
 - [x] `Redwood-AWS-TestVM` appears in the **Instances** list with state **Running**
-- [x] **Networking** tab shows the primary ENI is in `Internal-Subnet` with private IP `10.100.2.10` and **no public IPv4 address**
-- [x] Security group `Redwood-AWS-TestVM-SG` is attached and contains SSH (22) and HTTP (80) rules sourced from `10.100.0.0/16`
+- [x] **Networking** tab shows the primary ENI is in `Private-Subnet` with private IP `10.100.2.10` and **no public IPv4 address**
+- [x] Security group `Redwood-AWS-TestVM-SG` is attached and contains SSH (22) and HTTP (80) rules sourced from `0.0.0.0/0`
 - [x] Tag `Project = Redwood-AWS-101` is present
 
 ---
@@ -205,7 +205,7 @@ Address objects are reusable references that FortiGate uses in policies, VIPs, a
 Virtual IPs (VIPs) are FortiGate's destination NAT mechanism. Each VIP maps a `(public IP, public port)` tuple to a `(private IP, private port)` tuple. You will create two VIPs — one for SSH, one for HTTP — both targeting `Redwood-AWS-TestVM`.
 
 > [!NOTE]
-> The **External IP address** is set to `0.0.0.0` rather than the FortiGate Elastic IP. This is the standard pattern for AWS-deployed FortiGates — `port1` carries a private VPC address (e.g., `10.100.1.x`), while the Elastic IP is provided by the IGW via 1:1 NAT (transparent to FortiOS). Setting the External IP to `0.0.0.0` instructs FortiGate to use the actual `port1` interface IP at runtime, which AWS then 1:1-NATs from the Elastic IP.
+> The **Public IP address** is set to `0.0.0.0` rather than the FortiGate Elastic IP. This is the standard pattern for AWS-deployed FortiGates — `port1` carries a private VPC address (e.g., `10.100.1.x`), while the Elastic IP is provided by the IGW via 1:1 NAT (transparent to FortiOS). Setting the External IP to `0.0.0.0` instructs FortiGate to use the actual `port1` interface IP at runtime, which AWS then 1:1-NATs from the Elastic IP.
 
 1. **Create the SSH VIP:**
    - In the left navigation menu, click **Policy & Objects → Virtual IPs**
@@ -325,18 +325,18 @@ You will now connect to the test VM from your workstation by SSH'ing to FortiGat
    - On macOS / Linux / WSL, run:
 
      ```bash
-     ssh -i ~/.ssh/aws-101/Redwood-AWS-FGT-Key.pem -p 2222 ec2-user@<FortiGate-Elastic-IP>
+     ssh -i ~/.ssh/aws-101/Redwood-AWS-FGT-Key.pem -p 2222 ubuntu@<FortiGate-Elastic-IP>
      ```
 
    - On Windows / PuTTY, set:
      - Host name: `<FortiGate-Elastic-IP>`
      - Port: `2222`
      - Connection → SSH → Auth → Private key file: `Redwood-AWS-FGT-Key.ppk`
-     - Login as: `ec2-user`
+     - Login as: `ubuntu`
 
 2. **Accept the host key warning the first time:**
    - When you see "The authenticity of host '... can't be established'", type `yes` and press Enter
-   - You should land at the prompt: `[ec2-user@ip-10-100-2-10 ~]$`
+   - You should land at the prompt: `[ubuntu@ip-10-100-2-10 ~]$`
 
 > [!TIP]
 > If the SSH connection hangs or refuses, check (in order): your local SSH client is reaching FortiGate on TCP/2222 (security group `Redwood-AWS-FGT-SG` must allow SSH from your IP — added in Lab 2 Step 3); the VIP and firewall policy you just created exist; the test VM is `Running`; and `Redwood-AWS-TestVM-SG` allows SSH from `0.0.0.0/16`.
@@ -530,7 +530,7 @@ Inbound flow (your workstation → test VM via VIP):
                                  ▼ VIP DNAT  :2222 → :22  (testvm_access_vip)
                             FortiGate port2
                                  │
-                                 ▼ AWS RT-Internal (local route inside subnet)
+                                 ▼ AWS RT-Private (local route inside subnet)
                             Redwood-AWS-TestVM (10.100.2.10:22)
 
 
@@ -538,7 +538,7 @@ Outbound flow (test VM → Internet):
 
   Redwood-AWS-TestVM (10.100.2.10)
                                  │
-                                 ▼ AWS RT-Internal: 0.0.0.0/0 → port2 ENI
+                                 ▼ AWS RT-Private: 0.0.0.0/0 → port2 ENI
                             FortiGate port2
                                  │
                                  ▼ Policy: internet_access (port2 → port1, NAT enabled)
@@ -567,7 +567,7 @@ Outbound flow (test VM → Internet):
 
 | Service | Command |
 | --- | --- |
-| SSH | `ssh -i ~/.ssh/aws-101/Redwood-AWS-FGT-Key.pem -p 2222 ec2-user@<FortiGate-EIP>` |
+| SSH | `ssh -i ~/.ssh/aws-101/Redwood-AWS-FGT-Key.pem -p 2222 ubuntu@<FortiGate-EIP>` |
 | HTTP (once an HTTP server is running on the VM) | `curl http://<FortiGate-EIP>:8080` |
 
 **Useful commands from inside the test VM:**
@@ -598,7 +598,7 @@ Ready for [***Lab 4 — Site-to-Site VPN Configuration***](/aws-101-lab4/README.
 In Lab 4 you will:
 
 - Configure an IPsec VPN tunnel between the AWS FortiGate (`Redwood-AWS-FGT`) and the on-premises FortiGate
-- Establish bidirectional connectivity between the AWS `Internal-Subnet` (`10.100.2.0/24`) and the on-prem network (`192.168.0.0/22`)
+- Establish bidirectional connectivity between the AWS `Private-Subnet` (`10.100.2.0/24`) and the on-prem network (`192.168.0.0/22`)
 - Create FortiGate firewall policies for the VPN traffic
 - Validate end-to-end ping and TCP traffic across the tunnel
 - Inspect tunnel state and traffic in FortiGate's IPsec dashboard
@@ -611,7 +611,7 @@ This will complete the hybrid-cloud connectivity story for Redwood Industries.
 
 Before moving to Lab 4, verify:
 
-- [ ] `Redwood-AWS-TestVM` is **Running** with **3/3 checks passed**, in `Internal-Subnet`, private IP `10.100.2.10`, **no public IP**
+- [ ] `Redwood-AWS-TestVM` is **Running** with **3/3 checks passed**, in `Private-Subnet`, private IP `10.100.2.10`, **no public IP**
 - [ ] Security group `Redwood-AWS-TestVM-SG` allows SSH (22) and HTTP (80)
 - [ ] FortiGate address object `TESTVM-INTERNAL` exists at `10.100.2.10/32`
 - [ ] VIPs `TESTVM-INTERNAL-VIP-SSH` (`:2222 → :22`) and `TESTVM-INTERNAL-VIP-HTTP` (`:8080 → :80`) exist on `port1`
@@ -642,7 +642,7 @@ Before moving to Lab 4, verify:
 | Symptom | Likely cause | Fix |
 | --- | --- | --- |
 | `ping 8.8.8.8` shows packets transmitted but 100% loss | NAT disabled on `internet_access` policy | Edit policy, ensure **NAT** is **Enabled** with **Use Outgoing Interface Address** |
-| DNS resolution fails (`ping www.google.com`) | NAT works but DNS UDP/53 not reaching FortiGate | Verify `internet_access` policy Service is `ALL` (not just HTTP/HTTPS); verify `Redwood-AWS-RT-Internal` default route is `0.0.0.0/0 → port2 ENI` |
+| DNS resolution fails (`ping www.google.com`) | NAT works but DNS UDP/53 not reaching FortiGate | Verify `internet_access` policy Service is `ALL` (not just HTTP/HTTPS); verify `Redwood-AWS-RT-Private` default route is `0.0.0.0/0 → port2 ENI` |
 | Internet works for some destinations, fails for others | FortiGuard / web filter blocking | Check **Log & Report → Forward Traffic** for `deny` entries; the workshop policy doesn't enable security profiles, so denies should be rare |
 | `curl ifconfig.me` returns the wrong IP | Test VM has an auto-assigned public IP | EC2 → Instance details → Networking — primary ENI should show no public IPv4. If it does, you forgot to disable "Auto-assign public IPv4" at launch |
 
@@ -665,7 +665,7 @@ When debugging which policy applies to a flow, use FortiGate's built-in lookup:
 - Source: `10.100.2.10`
 - Authentication: `Any`
 - Destination Address: `8.8.8.8`
-- Click **Find mathing policy** — FortiGate shows the matching policy or "Implicit Deny" if no matching policy were found
+- Click **Find matching policy** — FortiGate shows the matching policy or "Implicit Deny" if no matching policy were found
 
 ---
 
@@ -700,5 +700,5 @@ diagnose debug reset
 
 ---
 
-*Lab Guide Version 1.0 — April 2026*
+*Lab Guide Version 1.0 — May 2026*
 *Questions? Ask your instructor or refer to the troubleshooting section.*

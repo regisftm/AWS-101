@@ -6,52 +6,24 @@
 
 Deploy a FortiGate-VM from the AWS Marketplace into the VPC built in Lab 1, attach a second Elastic Network Interface (ENI) so the firewall has both an external (`port1`) and internal (`port2`) presence, license the appliance with FortiFlex, and configure VPC route tables to steer all subnet traffic through FortiGate for inspection.
 
-This lab combines the appliance deployment with the routing configuration — by the end, every packet entering or leaving `Internal-Subnet` will pass through FortiGate, and `External-Subnet` will have a working path to the Internet via the IGW from Lab 1.
+This lab combines the appliance deployment with the routing configuration — by the end, every packet entering or leaving `Private-Subnet` will pass through FortiGate, and `Public-Subnet` will have a working path to the Internet via the IGW from Lab 1.
 
 ### What You'll Build
 
 - A FortiGate-VM EC2 instance (`Redwood-AWS-FGT`) running FortiOS 8.0.x on a `c5.large` instance in `ca-central-1a`
-- `port1` ENI in `External-Subnet` with an Elastic IP for management and Internet egress
-- `port2` ENI in `Internal-Subnet` with a **static** private IP of `10.100.2.4` for traffic inspection
+- `port1` ENI in `Public-Subnet` with an Elastic IP for management and Internet egress
+- `port2` ENI in `Private-Subnet` with a **static** private IP of `10.100.2.4` for traffic inspection
 - **Source/Destination check** disabled on both ENIs (required for any AWS instance acting as a router/firewall)
 - FortiFlex license activated, FortiGuard registered, FortiGate GUI reachable via HTTPS
-- `Redwood-AWS-RT-Internal` route table — `0.0.0.0/0` → FortiGate `port2` ENI, associated with `Internal-Subnet` (the External Subnet's route table was built in Lab 1)
+- `Redwood-AWS-RT-Private` route table — `0.0.0.0/0` → FortiGate `port2` ENI, associated with `Private-Subnet` (the Public Subnet's route table was built in Lab 1)
 
 ### Architecture After Lab 2
 
-```text
-                 ┌────────────────────────────────────┐
-                 │  Internet                          │
-                 └─────────────────┬──────────────────┘
-                                   │
-                 ┌─────────────────┴──────────────────┐
-                 │  Redwood-AWS-IGW                   │
-                 └─────────────────┬──────────────────┘
-                                   │
-            (Redwood-AWS-RT-External: 0.0.0.0/0 → IGW)
-                                   │
-┌──────────────────────────────────┴──────────────────────────────────┐
-│  Redwood-AWS-VPC  (10.100.0.0/16)  —  ca-central-1a                 │
-│                                                                     │
-│  ┌──────────────────────────┐   ┌─────────────────────────────────┐ │
-│  │ External-Subnet          │   │ Internal-Subnet                 │ │
-│  │ 10.100.1.0/24            │   │ 10.100.2.0/24                   │ │
-│  │                          │   │                                 │ │
-│  │  ┌────────────────────┐  │   │  ┌────────────────────────────┐ │ │
-│  │  │ Redwood-AWS-FGT    │  │   │  │ Redwood-AWS-FGT            │ │ │
-│  │  │ port1 (ENI)        │◄─┼───┼──┤ port2 (ENI)  10.100.2.4    │ │ │
-│  │  │ + Elastic IP       │  │   │  │  (static)                  │ │ │
-│  │  └────────────────────┘  │   │  └────────────────────────────┘ │ │
-│  │                          │   │                                 │ │
-│  │                          │   │  (Redwood-AWS-RT-Internal:      │ │
-│  │                          │   │   0.0.0.0/0 → port2 ENI)        │ │
-│  └──────────────────────────┘   └─────────────────────────────────┘ │
-└─────────────────────────────────────────────────────────────────────┘
-```
+![REFERENCE ARCHITECTURE](images/reference-architecture-lab2.png)
 
 ### Business Context
 
-Redwood Industries' security policy requires every workload — on-premises **and** cloud — to be inspected by FortiGate before traffic reaches the Internet or another network segment. In Lab 1 you built the AWS networking foundation. In this lab, you deploy the security appliance that turns that foundation into an inspected enclave: a FortiGate-VM acting as the single point of egress and ingress for the `Internal-Subnet`. Once the route tables are associated, every workload deployed in Lab 3 will have its traffic steered through FortiGate automatically — no per-VM configuration required.
+Redwood Industries' security policy requires every workload — on-premises **and** cloud — to be inspected by FortiGate before traffic reaches the Internet or another network segment. In Lab 1 you built the AWS networking foundation. In this lab, you deploy the security appliance that turns that foundation into an inspected enclave: a FortiGate-VM acting as the single point of egress and ingress for the `Private-Subnet`. Once the route tables are associated, every workload deployed in Lab 3 will have its traffic steered through FortiGate automatically — no per-VM configuration required.
 
 ---
 
@@ -138,11 +110,13 @@ EC2 key pairs provide SSH access to Linux instances and serve as the initial cre
 
 3. **Move the file to a safe location and tighten permissions:**
    - On **macOS / Linux / WSL** (the `.pem` file must not be world-readable or SSH will refuse to use it):
+
      ```bash
      mkdir -p ~/.ssh/aws-101
      mv ~/Downloads/Redwood-AWS-FGT-Key.pem ~/.ssh/aws-101/
      chmod 400 ~/.ssh/aws-101/Redwood-AWS-FGT-Key.pem
      ```
+
    - On **Windows (PowerShell)** — keep the `.ppk` file with PuTTY's other keys (commonly `C:\Users\<you>\Documents\AWS-101\`). PuTTY does not enforce a permissions check.
 
 4. **Verify the key pair exists in AWS:**
@@ -159,7 +133,7 @@ EC2 key pairs provide SSH access to Linux instances and serve as the initial cre
 
 ## Step 3: Launch the FortiGate EC2 Instance
 
-In this step you launch a new EC2 instance from the FortiGate AMI, placing its primary network interface (`port1`) in `External-Subnet`. The secondary interface (`port2`) is added in Step 5.
+In this step you launch a new EC2 instance from the FortiGate AMI, placing its primary network interface (`port1`) in `Public-Subnet`. The secondary interface (`port2`) is added in Step 5.
 
 1. **Open the EC2 console:**
    - In the top search bar, type `EC2` and click **EC2** (the service result)
@@ -203,7 +177,7 @@ In this step you launch a new EC2 instance from the FortiGate AMI, placing its p
      | Parameter | Value |
      | --- | --- |
      | VPC | `Redwood-AWS-VPC` |
-     | Subnet | `External-Subnet` |
+     | Subnet | `Public-Subnet` |
      | Auto-assign public IP | **Disable** |
      | Firewall (security groups) | **Create security group** |
      | Security group name | `Redwood-AWS-FGT-SG` |
@@ -215,7 +189,6 @@ In this step you launch a new EC2 instance from the FortiGate AMI, placing its p
      | --- | --- | --- | --- | --- | --- |
      | ssh | TCP | 22 | My IP | (auto-filled) | FortiGate CLI |
      | HTTPS | TCP | 443 | My IP | (auto-filled) | FortiGate GUI |
-     | Custom TCP | TCP | 541 | Anywhere | `0.0.0.0/0` | FortiGuard / FortiFlex |
      | Custom TCP | TCP | 2222 | Anywhere | `0.0.0.0/0` | Incoming access to server |
      | Custom TCP | TCP | 8080 | Anywhere | `0.0.0.0/0` | Incoming access to server |
      | All traffic | All | All | Custom | 10.100.0.0/16 | Traffic from VPC |
@@ -241,14 +214,14 @@ In this step you launch a new EC2 instance from the FortiGate AMI, placing its p
     - Click **View all instances**
     - Refresh the **Instances** page until the **Instance state** shows **Running**
     - Wait until the **Status check** column shows **3/3 checks passed** (typically 2–4 minutes for a `c5.large`)
-    - Click on the reload buttom to update the **Status check**
+    - Click on the reload button to update the **Status check**
 
 ### Validation
 
 - [x] `Redwood-AWS-FGT` appears in the **Instances** list with state **Running**
 - [x] Instance type shows `c5.large`
 - [x] AMI ID begins with `ami-` and the AMI name contains `FortiGate` and `8.0`
-- [x] **Networking** tab shows the primary ENI is in `External-Subnet` with **no public IPv4 address yet**
+- [x] **Networking** tab shows the primary ENI is in `Public-Subnet` with **no public IPv4 address yet**
 - [x] Security group `Redwood-AWS-FGT-SG` is attached and contains the five inbound rules above
 
 ---
@@ -287,7 +260,7 @@ In AWS, public IPv4 addresses come in two flavours: **auto-assigned** (released 
    - Click **Associate**
 
 > [!TIP]
-> To find the primary ENI quickly, go to **EC2 → Instances → Redwood-AWS-FGT → Networking** and copy the **Interface ID** of the network interface in `External-Subnet`.
+> To find the primary ENI quickly, go to **EC2 → Instances → Redwood-AWS-FGT → Networking** and copy the **Interface ID** of the network interface in `Public-Subnet`.
 
 3. **Note the Elastic IP value:**
    - Copy the **Allocated IPv4 address** value (e.g., `15.222.x.x`)
@@ -303,7 +276,7 @@ In AWS, public IPv4 addresses come in two flavours: **auto-assigned** (released 
 
 ## Step 5: Create the `port2` Elastic Network Interface
 
-FortiGate's internal interface must live in `Internal-Subnet` and must use the **static** private IP `10.100.2.4` so that the Lab 2 route table can use it as a deterministic next-hop. You will create this ENI as a separate object first, then attach it in Step 6.
+FortiGate's internal interface must live in `Private-Subnet` and must use the **static** private IP `10.100.2.4` so that the Lab 2 route table can use it as a deterministic next-hop. You will create this ENI as a separate object first, then attach it in Step 6.
 
 1. **Open the Network Interfaces console:**
    - In the EC2 console left navigation menu under **Network & Security**, click **Network Interfaces**
@@ -315,7 +288,7 @@ FortiGate's internal interface must live in `Internal-Subnet` and must use the *
      | Parameter | Value |
      | --- | --- |
      | Description | `Redwood-AWS-FGT port2 (internal inspection interface)` |
-     | Subnet | `Internal-Subnet` |
+     | Subnet | `Private-Subnet` |
      | Interface type | **ENA** |
      | Private IPv4 address — assignment | **Custom** |
      | Private IPv4 address | `10.100.2.4` |
@@ -327,12 +300,12 @@ FortiGate's internal interface must live in `Internal-Subnet` and must use the *
    - Click **Create network interface**
 
 > [!IMPORTANT]
-> The private IP **must** be exactly `10.100.2.4`. The `Internal-Subnet` route table you build in Step 9 will set this as the next-hop for `0.0.0.0/0`. If `port2` ends up on any other IP, all egress from the subnet will black-hole.
+> The private IP **must** be exactly `10.100.2.4`. The `Private-Subnet` route table you build in Step 9 will set this as the next-hop for `0.0.0.0/0`. If `port2` ends up on any other IP, all egress from the subnet will black-hole.
 
 ### Validation
 
 - [x] `Redwood-AWS-FGT-port2` appears in **Network Interfaces** with **Status: Available**
-- [x] Subnet shows `Internal-Subnet`, primary private IPv4 shows `10.100.2.4`
+- [x] Subnet shows `Private-Subnet`, primary private IPv4 shows `10.100.2.4`
 - [x] **Source/destination check** column shows **Enabled** (you will disable it in Step 7)
 
 ---
@@ -363,13 +336,13 @@ The new ENI exists but is unattached. Attaching it adds a second virtual NIC to 
 3. **Verify the attachment:**
    - With `Redwood-AWS-FGT` still selected, click the **Networking** tab in the lower details pane
    - Confirm two **Network interfaces** are listed
-   - Confirm the primary (`port1`) is in `External-Subnet` and the secondary (`port2`) is in `Internal-Subnet` at `10.100.2.4`
+   - Confirm the primary (`port1`) is in `Public-Subnet` and the secondary (`port2`) is in `Private-Subnet` at `10.100.2.4`
 
 ### Validation
 
 - [x] `Redwood-AWS-FGT` shows two attached network interfaces
-- [x] `port1` ENI is in `External-Subnet` with the Elastic IP from Step 4 associated
-- [x] `port2` ENI is in `Internal-Subnet` with private IP `10.100.2.4`
+- [x] `port1` ENI is in `Public-Subnet` with the Elastic IP from Step 4 associated
+- [x] `port2` ENI is in `Private-Subnet` with private IP `10.100.2.4`
 
 ---
 
@@ -379,7 +352,7 @@ By default, AWS drops any packet that arrives at an ENI whose source or destinat
 
 1. **Disable on `port1` (primary ENI):**
    - In the EC2 console left navigation menu under **Network & Security**, click **Network Interfaces**
-   - Select the primary ENI of `Redwood-AWS-FGT` (the one in `External-Subnet`)
+   - Select the primary ENI of `Redwood-AWS-FGT` (the one in `Public-Subnet`)
    - Click **Actions → Change source/dest. check** and use the parameter below.
 
      | Parameter | Value |
@@ -474,15 +447,15 @@ FortiGate-VM has a permanent **evaluation** VM license limited to 1 CPUs and 2 G
 
 ## PART 2: Traffic Steering Configuration
 
-`External-Subnet` is already routed to the Internet — `Redwood-AWS-RT-External` was created in Lab 1 and is what allowed Step 8 to reach the FortiGate GUI and activate the FortiFlex licence. The remaining piece is the **Internal Subnet route table**, which can only be built now that FortiGate's `port2` ENI exists to serve as the next-hop.
+`Public-Subnet` is already routed to the Internet — `Redwood-AWS-RT-Public` was created in Lab 1 and is what allowed Step 8 to reach the FortiGate GUI and activate the FortiFlex licence. The remaining piece is the **Private Subnet route table**, which can only be built now that FortiGate's `port2` ENI exists to serve as the next-hop.
 
-`Redwood-AWS-RT-Internal` will send `0.0.0.0/0` from `Internal-Subnet` to FortiGate's `port2` ENI, so any workload deployed in Lab 3 has its egress automatically inspected by FortiGate. Without this route, an instance in `Internal-Subnet` would have no path off the subnet at all (the VPC main route table only has the implicit `local` route).
+`Redwood-AWS-RT-Private` will send `0.0.0.0/0` from `Private-Subnet` to FortiGate's `port2` ENI, so any workload deployed in Lab 3 has its egress automatically inspected by FortiGate. Without this route, an instance in `Private-Subnet` would have no path off the subnet at all (the VPC main route table only has the implicit `local` route).
 
 ---
 
-## Step 9: Create and Configure the Internal Subnet Route Table
+## Step 9: Create and Configure the Private Subnet Route Table
 
-This is the route table that turns FortiGate into the inspection point for `Internal-Subnet`. The next-hop is FortiGate's `port2` ENI (not its IP, not the instance ID — AWS routes to the ENI object directly).
+This is the route table that turns FortiGate into the inspection point for `Private-Subnet`. The next-hop is FortiGate's `port2` ENI (not its IP, not the instance ID — AWS routes to the ENI object directly).
 
 1. **Create the route table:**
    - In the VPC console left navigation menu under **Virtual private cloud**, click **Route tables**
@@ -490,7 +463,7 @@ This is the route table that turns FortiGate into the inspection point for `Inte
 
      | Parameter | Value |
      | --- | --- |
-     | Name | `Redwood-AWS-RT-Internal` |
+     | Name | `Redwood-AWS-RT-Private` |
      | VPC | `Redwood-AWS-VPC` |
      | Tags |
      | `Project` | `Redwood-AWS-101` |
@@ -498,7 +471,7 @@ This is the route table that turns FortiGate into the inspection point for `Inte
    - Click **Create route table**
 
 2. **Add the default route to FortiGate `port2`:**
-   - Open the new `Redwood-AWS-RT-Internal` route table
+   - Open the new `Redwood-AWS-RT-Private` route table
    - Click the **Routes** tab
    - Click **Edit routes → Add route** and use the parameters below.
 
@@ -512,20 +485,20 @@ This is the route table that turns FortiGate into the inspection point for `Inte
 > [!IMPORTANT]
 > The target is the **ENI**, not an IP address or instance. AWS console will show the ENI's interface ID (`eni-xxxxxxxxxxxxxxxxx`) and its private IP `10.100.2.4`. If you select an IP target instead, the route will resolve incorrectly when the instance is replaced.
 
-3. **Associate the route table with `Internal-Subnet`:**
+3. **Associate the route table with `Private-Subnet`:**
    - Click the **Subnet associations** tab
    - Click **Edit subnet associations** and use the parameter below.
 
      | Parameter | Value |
      | --- | --- |
-     | Subnets to associate | `Internal-Subnet` (`10.100.2.0/24`) |
+     | Subnets to associate | `Private-Subnet` (`10.100.2.0/24`) |
 
    - Click **Save associations**
 
 ### Validation
 
-- [x] `Redwood-AWS-RT-Internal` exists with two routes: `10.100.0.0/16 → local` and `0.0.0.0/0 → eni-xxxxxxxx (Redwood-AWS-FGT-port2)`
-- [x] `Internal-Subnet` appears under **Subnet associations** for this route table
+- [x] `Redwood-AWS-RT-Private` exists with two routes: `10.100.0.0/16 → local` and `0.0.0.0/0 → eni-xxxxxxxx (Redwood-AWS-FGT-port2)`
+- [x] `Private-Subnet` appears under **Subnet associations** for this route table
 - [x] **VPC → Route tables** shows the **Main** route table is no longer associated with either subnet (both are now using their dedicated tables)
 
 ---
@@ -547,21 +520,21 @@ Current state after Lab 2:
                       │  Redwood-AWS-IGW   │
                       └──────────┬─────────┘
                                  │
-                  (RT-External: 0/0 → IGW)
+                  (RT-Public: 0/0 → IGW)
                                  │
 ┌────────────────────────────────┴───────────────────────────────────┐
 │  Redwood-AWS-VPC  (10.100.0.0/16)  —  ca-central-1a                │
 │                                                                    │
-│  ┌─────────────── External-Subnet (10.100.1.0/24) ──────────────┐  │
+│  ┌─────────────── Public-Subnet (10.100.1.0/24) ────────────────┐  │
 │  │   Redwood-AWS-FGT  port1 ENI  ──── EIP (15.x.x.x)            │  │
 │  └──────────────────────────────────────────────────────────────┘  │
 │                              ▲                                     │
 │                              │ (FortiOS internal routing)          │
 │                              ▼                                     │
-│  ┌─────────────── Internal-Subnet (10.100.2.0/24) ──────────────┐  │
+│  ┌─────────────── Private-Subnet (10.100.2.0/24) ───────────────┐  │
 │  │   Redwood-AWS-FGT  port2 ENI  10.100.2.4 (static)            │  │
 │  │              ▲                                               │  │
-│  │              │  (RT-Internal: 0/0 → port2 ENI)               │  │
+│  │              │  (RT-Private: 0/0 → port2 ENI)                │  │
 │  │   [empty — Lab 3 will deploy a test workload here]           │  │
 │  └──────────────────────────────────────────────────────────────┘  │
 └────────────────────────────────────────────────────────────────────┘
@@ -573,7 +546,7 @@ Current state after Lab 2:
 
 2. **Source/destination check is the AWS equivalent of "promiscuous mode".** Every ENI that forwards traffic on behalf of another instance must have this disabled. Forgetting to do so is the single most common reason FortiGate appears to be working but no inspected traffic flows through it.
 
-3. **Routes target ENIs, not IPs.** The `0.0.0.0/0 → ENI` entry in `Redwood-AWS-RT-Internal` references the `port2` ENI's interface ID, not the IP `10.100.2.4`. This is why the IP must be set as **static** when the ENI is created — replacing the instance later (e.g., during a resize or AMI update) preserves the ENI binding only if the IP is stable.
+3. **Routes target ENIs, not IPs.** The `0.0.0.0/0 → ENI` entry in `Redwood-AWS-RT-Private` references the `port2` ENI's interface ID, not the IP `10.100.2.4`. This is why the IP must be set as **static** when the ENI is created — replacing the instance later (e.g., during a resize or AMI update) preserves the ENI binding only if the IP is stable.
 
 4. **The Elastic IP binds the FortiFlex licence.** Releasing or reassociating the EIP after activation can invalidate the licence binding. Treat `Redwood-AWS-FGT-EIP` as a long-lived resource for the lifetime of the lab.
 
@@ -594,15 +567,15 @@ Current state after Lab 2:
 
 | Interface | Subnet | Private IP | Notes |
 | --- | --- | --- | --- |
-| `port1` | `External-Subnet` | DHCP `10.100.1.x` | Elastic IP `15.x.x.x` for management & egress |
-| `port2` | `Internal-Subnet` | `10.100.2.4` (static) | Next-hop for `Internal-Subnet` default route |
+| `port1` | `Public-Subnet` | DHCP `10.100.1.x` | Elastic IP `15.x.x.x` for management & egress |
+| `port2` | `Private-Subnet` | `10.100.2.4` (static) | Next-hop for `Private-Subnet` default route |
 
 **Route tables:**
 
 | Route table | Default route target | Associated subnet |
 | --- | --- | --- |
-| `Redwood-AWS-RT-External` | `Redwood-AWS-IGW` | `External-Subnet` |
-| `Redwood-AWS-RT-Internal` | `Redwood-AWS-FGT-port2` ENI | `Internal-Subnet` |
+| `Redwood-AWS-RT-Public` | `Redwood-AWS-IGW` | `Public-Subnet` |
+| `Redwood-AWS-RT-Private` | `Redwood-AWS-FGT-port2` ENI | `Private-Subnet` |
 
 ### Next Steps
 
@@ -610,7 +583,7 @@ Ready for [***Lab 3 — Security Policies & Traffic Testing***](/aws-101-lab3/RE
 
 In Lab 3 you will:
 
-- Deploy a test workload (Amazon Linux EC2) in `Internal-Subnet`
+- Deploy a test workload (Amazon Linux EC2) in `Private-Subnet`
 - Create FortiGate firewall policies to allow inspected outbound Internet access (with NAT)
 - Create a Virtual IP (VIP) and policy to expose SSH on the test workload through FortiGate's Elastic IP
 - Generate test traffic and watch it appear in **FortiView → Sources** and **Log & Report → Forward Traffic**
@@ -623,15 +596,15 @@ In Lab 3 you will:
 Before moving to Lab 3, verify:
 
 - [ ] `Redwood-AWS-FGT-Key` key pair exists in **EC2 → Key Pairs**, and the private key file is saved locally with permissions `400`
-- [ ] `Redwood-AWS-FGT` is **Running** with **2/2 checks passed**
-- [ ] Two ENIs attached: `port1` in `External-Subnet`, `port2` in `Internal-Subnet`
+- [ ] `Redwood-AWS-FGT` is **Running** with **3/3 checks passed**
+- [ ] Two ENIs attached: `port1` in `Public-Subnet`, `port2` in `Private-Subnet`
 - [ ] `port2` private IP is exactly `10.100.2.4`
 - [ ] **Source/destination check** is **Disabled** on **both** ENIs
 - [ ] Elastic IP `Redwood-AWS-FGT-EIP` is associated with the `port1` ENI
 - [ ] FortiGate GUI reachable at `https://<Elastic-IP>`
 - [ ] FortiFlex licence shows **Valid** in **System → FortiGuard**
-- [ ] `Redwood-AWS-RT-External` exists with `0.0.0.0/0 → Redwood-AWS-IGW`, associated with `External-Subnet`
-- [ ] `Redwood-AWS-RT-Internal` exists with `0.0.0.0/0 → Redwood-AWS-FGT-port2` ENI, associated with `Internal-Subnet`
+- [ ] `Redwood-AWS-RT-Public` exists with `0.0.0.0/0 → Redwood-AWS-IGW`, associated with `Public-Subnet`
+- [ ] `Redwood-AWS-RT-Private` exists with `0.0.0.0/0 → Redwood-AWS-FGT-port2` ENI, associated with `Private-Subnet`
 - [ ] All resources tagged with `Project=Redwood-AWS-101`
 
 ### AWS CLI Verification (Optional)
@@ -686,7 +659,7 @@ Expected: `SrcDstCheck` is `false` on both ENIs, both route tables list one subn
 
 | Symptom | Likely cause | Fix |
 | --- | --- | --- |
-| "Failed to contact FortiCare" | FortiGate cannot reach Internet via `port1` | Confirm Lab 1 Step 6 is complete (`Redwood-AWS-RT-External` associated with `External-Subnet`); test from FortiGate CLI: `execute ping fortiguard.com` |
+| "Failed to contact FortiCare" | FortiGate cannot reach Internet via `port1` | Confirm Lab 1 Step 6 is complete (`Redwood-AWS-RT-Public` associated with `Public-Subnet`); test from FortiGate CLI: `execute ping fortiguard.com` |
 | "Token already used" | Token previously consumed by another VM | Request a fresh token from your instructor |
 | "License invalid, please contact FortiCare" | Token format wrong, or token region-restricted | Verify the token string was pasted without leading/trailing whitespace; verify with the instructor that the token is valid for FortiGate-VM (not FortiAnalyzer/Manager) |
 | Licence stays in "Validating..." | Slow FortiCare response | Wait 5 minutes and refresh; if still stuck, navigate to **System → FortiGuard → Update FortiGuard servers** to retry |
@@ -695,9 +668,9 @@ Expected: `SrcDstCheck` is `false` on both ENIs, both route tables list one subn
 
 This becomes relevant in Lab 3, but check now:
 
-- `Redwood-AWS-RT-Internal` shows the `0.0.0.0/0 → eni-xxx` route (not `0.0.0.0/0 → instance i-xxx`)
+- `Redwood-AWS-RT-Private` shows the `0.0.0.0/0 → eni-xxx` route (not `0.0.0.0/0 → instance i-xxx`)
 - Both ENIs have **Source/dest. check: Disabled** (Step 7)
-- `Internal-Subnet` is associated with `Redwood-AWS-RT-Internal` (not the VPC main route table)
+- `Private-Subnet` is associated with `Redwood-AWS-RT-Private` (not the VPC main route table)
 - FortiGate firewall policies in Lab 3 are configured to allow `port2 → port1` with NAT enabled
 
 ### Instance Won't Start After ENI Attachment
@@ -726,5 +699,5 @@ This becomes relevant in Lab 3, but check now:
 
 ---
 
-*Lab Guide Version 1.0 — April 2026*
+*Lab Guide Version 1.0 — May 2026*
 *Questions? Ask your instructor or refer to the troubleshooting section.*

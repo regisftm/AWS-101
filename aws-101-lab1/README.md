@@ -4,15 +4,18 @@
 
 **Prerequisites:**
 
-- AWS account with IAM user/role holding `AdministratorAccess` (or equivalent VPC + EC2 + Resource Groups permissions)
+- AWS account with IAM user/role holding `AdministratorAccess` (or equivalent VPC + EC2 + Resource Groups permissions) 
 - Active region access to `ca-central-1` (Canada Central)
 - **FortiFlex token** for FortiGate BYOL licensing — required for Lab 2 (obtain from your instructor before the workshop begins)
+
+> [!NOTE]
+> MFA for the IAM user is recommended. Do not use the root account, observing the AWS Security pillar best practices.
 
 ### Objective
 
 Create the AWS networking foundation before deploying FortiGate. This "infrastructure-first" approach mirrors enterprise deployment patterns and provides a clean foundation for security appliances. In this lab, you'll build just the VPC, subnets, Internet Gateway and the public subnet route table and its association. The private subnet route table and its association will be configured in Lab 2 after FortiGate is deployed.
 
-This lab follows Fortinet's official **single FortiGate-VM** reference architecture for AWS, which uses **two subnets**: an Public (external) subnet for `port1` and an Private (internal) subnet that hosts both `port2` and the protected workloads.
+This lab follows Fortinet's official **single FortiGate-VM** reference architecture for AWS, which uses **two subnets**: a Public (external) subnet for `port1` and a Private (internal) subnet that hosts both `port2` and the protected workloads.
 
 ### What You'll Build
 
@@ -316,7 +319,7 @@ Production patterns that **do** inspect east-west on AWS — per-workload subnet
 **Traffic Flow (this lab):**
 
 ```text
----OUTBOND---
+---OUTBOUND---
 Workload (Private-Subnet) → port2 (inspect, NAT) → port1 → Internet Gateway → Internet 
 
 ---INBOUND---
@@ -463,25 +466,7 @@ You have successfully built the AWS networking foundation for Redwood Industries
 
 ### Architecture Review
 
-```text
-              ┌──────────────────────────────┐
-              │  Internet Gateway            │
-              │  Redwood-AWS-IGW             │
-              └──────────────┬───────────────┘
-                             │  (RT-Public: 0.0.0.0/0 → IGW)
-                             │
-┌────────────────────────────┴───────────────────────────────┐
-│  Redwood-AWS-VPC  (10.100.0.0/16)  —  ca-central-1a        │
-│                                                            │
-│  ┌──────────────────────┐  ┌────────────────────────────┐  │
-│  │ Public-Subnet        │  │ Private-Subnet             │  │
-│  │ 10.100.1.0/24        │  │ 10.100.2.0/24              │  │
-│  │ (FortiGate port1)    │  │ (FortiGate port2 +         │  │
-│  │                      │  │  protected workloads)      │  │
-│  │  RT: RT-Public       │  │  RT: (built in Lab 2)      │  │
-│  └──────────────────────┘  └────────────────────────────┘  │
-└────────────────────────────────────────────────────────────┘
-```
+![REFERENCE ARCHITECTURE](images/ref-architecture-lab1.png)
 
 Region: `ca-central-1`  
 Availability Zone: `ca-central-1a`
@@ -586,7 +571,7 @@ aws ec2 describe-internet-gateways \
 aws ec2 describe-route-tables \
   --filters "Name=tag:Name,Values=Redwood-AWS-RT-Public" \
   --query "RouteTables[0].{Name:Tags[?Key=='Name']|[0].Value,Routes:Routes[].[DestinationCidrBlock,GatewayId],AssocSubnets:Associations[].SubnetId}" \
-  --output json
+  --output table
 ```
 
 Expected output should match your configuration above.
@@ -616,5 +601,5 @@ Expected output should match your configuration above.
 
 ---
 
-*Lab Guide Version 1.0 — April 2026*  
+*Lab Guide Version 1.0 — May 2026*  
 *Questions? Ask your instructor or refer to the main workshop materials.*
