@@ -55,22 +55,30 @@ Before you can launch a FortiGate EC2 instance, you must subscribe to the BYOL M
    - Click **AWS Marketplace**
    - Confirm you are still in **ca-central-1** (top-right region selector)
 
+   ![MARKETPLACE](images/step1.1.png)
+
 2. **Search for the FortiGate BYOL listing:**
    - Click **Discover products**
    - In the search bar, type `Fortinet FortiGate Next-Generation Firewall`
    - Press Enter
 
+   ![DISCOVER](images/step1.2.png)
+
 3. **Select the correct listing:**
    - Click the listing published by **Fortinet, Inc.** with NO **"(PAYG)"** in the title
    - Review the overview pane (optional)
 
-   > [!NOTE]
-   > Fortinet publishes several FortiGate listings. The one you want is the BYOL (Bring Your Own License) variant — the PAYG (Pay-As-You-Go) listing bills the licence by the hour and is **not** what FortiFlex uses.
+   ![RIGHT PRODUCT](images/step1.3.png)
+
+> [!NOTE]
+> Fortinet publishes several FortiGate listings. The one you want is the BYOL (Bring Your Own License) variant — the PAYG (Pay-As-You-Go) listing bills the licence by the hour and is **not** what FortiFlex uses.
 
 4. **Subscribe to the listing:**
    - Click **View purchase options**
    - Click **Subscribe**
    - Accept the EULA when prompted (subscription is granted immediately)
+
+   ![PURCHASE](images/step1.4.png)
 
 5. **Skip the in-Marketplace launch wizard:**
    - The next page offers a **Continue to Configuration → Launch** flow — **do not use it** (it provides limited control over networking)
@@ -80,6 +88,8 @@ Before you can launch a FortiGate EC2 instance, you must subscribe to the BYOL M
 
 - [x] **AWS Marketplace > Manage subscriptions** lists `Fortinet FortiGate VM Next-Generation Firewall` in the **Active subscriptions** tab
 - [x] No EULA prompt remains outstanding
+  
+![VALIDATION](images/step1.validation.png)
 
 ---
 
@@ -95,6 +105,8 @@ EC2 key pairs provide SSH access to Linux instances and serve as the initial cre
    - In the left navigation menu under **Network & Security**, click **Key Pairs**
    - Confirm the region selector at the top right shows **Canada (Central) ca-central-1**
 
+   ![KEY PAIRS](images/step2.1.png)
+
 2. **Create the key pair:**
    - Click **Create key pair** and use the parameters below.
 
@@ -103,10 +115,12 @@ EC2 key pairs provide SSH access to Linux instances and serve as the initial cre
      | Name | `Redwood-AWS-FGT-Key` |
      | Key pair type | `RSA` |
      | Private key file format | `.pem` (macOS / Linux / WSL / OpenSSH) **or** `.ppk` (Windows / PuTTY) |
-     | Tags |
+     | Tags | |
      | `Project` | `Redwood-AWS-101` |
 
    - Click **Create key pair**. Your browser will immediately download `Redwood-AWS-FGT-Key.pem` (or `.ppk`).
+
+   ![CREATE KEY PAIR](images/step2.2.png)
 
 3. **Move the file to a safe location and tighten permissions:**
    - On **macOS / Linux / WSL** (the `.pem` file must not be world-readable or SSH will refuse to use it):
@@ -121,11 +135,13 @@ EC2 key pairs provide SSH access to Linux instances and serve as the initial cre
 
 4. **Verify the key pair exists in AWS:**
    - Return to the **Key Pairs** console
-   - Confirm `Redwood-AWS-FGT-Key` is listed with **Type: RSA** and a **Fingerprint** value
+   - Confirm `Redwood-AWS-FGT-Key` is listed with **Type: rsa** and a **Fingerprint** value
+
+   ![VERIFICATION](images/step2.4.png)
 
 ### Validation
 
-- [x] `Redwood-AWS-FGT-Key` appears in **EC2 → Key Pairs** with type **RSA**
+- [x] `Redwood-AWS-FGT-Key` appears in **EC2 → Key Pairs** with type **rsa**
 - [x] You have the downloaded `.pem` (or `.ppk`) file saved in a known, secure location
 - [x] On macOS / Linux / WSL, `ls -l Redwood-AWS-FGT-Key.pem` shows permissions `-r--------` (400)
 
@@ -140,16 +156,20 @@ In this step you launch a new EC2 instance from the FortiGate AMI, placing its p
    - In the left navigation menu, click **Instances**
    - Click **Launch instances**
 
+   ![LAUNCH INSTANCE](images/step3.1.png)
+
 2. **Name and tags:**
    - Click **Add additional tags** and enter the values below. The `Name` tag is set automatically from the **Name** field at the top.
 
      | Parameter | Value |
      | --- | --- |
      | Name | `Redwood-AWS-FGT` |
-     | Tags |
+     | Tags | | 
      | `Project` | `Redwood-AWS-101` |
 
    - Click **Add tag to resource types → Instances, Volumes, Network interfaces** so the tags propagate to the EBS volume and the primary ENI.
+
+   ![TAGS](images/step3.2.png)
 
 3. **Application and OS Images (Amazon Machine Image):**
    - Click **Browse more AMIs**
@@ -157,12 +177,16 @@ In this step you launch a new EC2 instance from the FortiGate AMI, placing its p
    - Search for `FortiGate BYOL`
    - Select the **Fortinet FortiGate (BYOL) Next-Generation Firewall** listing and click **Select**
 
+   ![SELECT AMI](images/step3.3.png)
+
 4. **Instance type:**
    - Use the parameter below.
 
      | Parameter | Value |
      | --- | --- |
      | Instance type | `c5.large` (2 vCPU, 4 GB, dedicated CPU, ENA) |
+
+   ![INSTANCE TYPE](images/step3.4.png)
 
 > [!NOTE]
 > `c5.large` is the smallest officially supported FortiGate-VM instance type for AWS. For production workloads, Fortinet recommends `c5.xlarge` or larger. For this lab's traffic profile, `c5.large` is sufficient and minimizes EC2 cost.
@@ -183,6 +207,8 @@ In this step you launch a new EC2 instance from the FortiGate AMI, placing its p
      | Security group name | `Redwood-AWS-FGT-SG` |
      | Description | `Management and inspection access for Redwood-AWS-FGT` |
 
+     ![NETWORK SETTINGS](images/step3.6.a.png)
+
    - In the **Inbound security group rules** section, replace the default rule with the three rules below.
 
      | Type | Protocol | Port range | Source type | Source | Description |
@@ -193,6 +219,8 @@ In this step you launch a new EC2 instance from the FortiGate AMI, placing its p
      | Custom TCP | TCP | 8080 | Anywhere | `0.0.0.0/0` | Incoming access to server |
      | All traffic | All | All | Custom | 10.100.0.0/16 | Traffic from VPC |
 
+     ![SG GROUP CONFIG I](images/step3.6.b.gif)
+     ![SG GROUP CONFIG II](images/step3.6.d.png)
 
 > [!IMPORTANT]
 > The "Auto-assign public IP" must be **Disabled**. You will associate a dedicated **Elastic IP** with `port1` in Step 4 — an auto-assigned public IP would be released the first time the instance is stopped, which would invalidate the FortiFlex licence binding.
@@ -210,11 +238,15 @@ In this step you launch a new EC2 instance from the FortiGate AMI, placing its p
    - Confirm **Number of instances** is `1`
    - Click **Launch instance**
 
+   ![LAUNCH INSTANCE](images/step3.8.png)
+
 9. **Wait for the instance to reach `Running` state:**
     - Click **View all instances**
     - Refresh the **Instances** page until the **Instance state** shows **Running**
     - Wait until the **Status check** column shows **3/3 checks passed** (typically 2–4 minutes for a `c5.large`)
     - Click on the reload button to update the **Status check**
+
+   ![RUNNING](images/step3.9.png)
 
 ### Validation
 
@@ -233,21 +265,29 @@ In AWS, public IPv4 addresses come in two flavours: **auto-assigned** (released 
 1. **Allocate the Elastic IP:**
    - In the EC2 console left navigation menu under **Network & Security**, click **Elastic IPs**
    - Click **Allocate Elastic IP address**
+  
+     ![ALLOCATE EIP](images/step4.1.a.png)
+
    - Use the parameters below.
 
      | Parameter | Value |
      | --- | --- |
      | Public IPv4 address pool | **Amazon's pool of IPv4 addresses** |
      | Network Border Group | `ca-central-1` |
-     | Tags |
+     | Tags | |
      | `Name` | `Redwood-AWS-FGT-EIP` |
      | `Project` | `Redwood-AWS-101` |
 
    - Click **Allocate**
 
+     ![ALLOCATE](images/step4.1.b.png)
+
 2. **Associate the EIP with the FortiGate primary ENI:**
    - In the **Elastic IPs** list, select the row for the new EIP
    - Click **Actions → Associate Elastic IP address**
+
+     ![ASSOCIATE EIP](images/step4.2.a.png)
+
    - Use the parameters below.
 
      | Parameter | Value |
@@ -259,8 +299,7 @@ In AWS, public IPv4 addresses come in two flavours: **auto-assigned** (released 
 
    - Click **Associate**
 
-> [!TIP]
-> To find the primary ENI quickly, go to **EC2 → Instances → Redwood-AWS-FGT → Networking** and copy the **Interface ID** of the network interface in `Public-Subnet`.
+     ![ASSOCIATE](images/step4.2.b.png)
 
 3. **Note the Elastic IP value:**
    - Copy the **Allocated IPv4 address** value (e.g., `15.222.x.x`)
@@ -282,6 +321,8 @@ FortiGate's internal interface must live in `Private-Subnet` and must use the **
    - In the EC2 console left navigation menu under **Network & Security**, click **Network Interfaces**
    - Click **Create network interface**
 
+     ![CREATE ENI](images/step5.1.png)
+
 2. **Configure the ENI:**
    - Use the parameters below.
 
@@ -299,8 +340,7 @@ FortiGate's internal interface must live in `Private-Subnet` and must use the **
 
    - Click **Create network interface**
 
-> [!IMPORTANT]
-> The private IP **must** be exactly `10.100.2.4`. The `Private-Subnet` route table you build in Step 9 will set this as the next-hop for `0.0.0.0/0`. If `port2` ends up on any other IP, all egress from the subnet will black-hole.
+     ![CREATE](images/step5.2.gif)
 
 ### Validation
 
@@ -318,6 +358,9 @@ The new ENI exists but is unattached. Attaching it adds a second virtual NIC to 
    - In the EC2 console left navigation menu, click **Instances**
    - Select the row for `Redwood-AWS-FGT`
    - Click **Instance state → Stop instance** and confirm
+
+     ![STOP INSTANCE](images/step6.1.png)
+
    - Wait until the **Instance state** column shows **Stopped**
 
 > [!NOTE]
@@ -326,6 +369,8 @@ The new ENI exists but is unattached. Attaching it adds a second virtual NIC to 
 2. **Attach the ENI:**
    - With `Redwood-AWS-FGT` still selected, click **Actions → Networking → Attach network interface** and use the parameters below.
 
+     ![ATTACH ENI](images/step6.2.a.png)
+
      | Parameter | Value |
      | --- | --- |
      | VPC | Redwood-AWS-VPC |
@@ -333,10 +378,14 @@ The new ENI exists but is unattached. Attaching it adds a second virtual NIC to 
 
    - Click **Attach**
 
+     ![ATTACH](images/step6.2.b.png)
+
 3. **Verify the attachment:**
    - With `Redwood-AWS-FGT` still selected, click the **Networking** tab in the lower details pane
    - Confirm two **Network interfaces** are listed
    - Confirm the primary (`port1`) is in `Public-Subnet` and the secondary (`port2`) is in `Private-Subnet` at `10.100.2.4`
+
+   ![VERIFY](images/step6.3.gif)
 
 ### Validation
 
@@ -361,6 +410,8 @@ By default, AWS drops any packet that arrives at an ENI whose source or destinat
 
    - Click **Save**
 
+     ![UNCHECK SRC/DST CHECKING](images/step7.1.gif)
+
 2. **Disable on `port2`:**
    - In the same **Network Interfaces** list, select `Redwood-AWS-FGT-port2`
    - Click **Actions → Change source/dest. check**
@@ -371,6 +422,8 @@ By default, AWS drops any packet that arrives at an ENI whose source or destinat
    - Select the row for `Redwood-AWS-FGT`
    - Click **Instance state → Start instance**
    - Wait until the **Status check** column shows **3/3 checks passed**
+
+     ![START INSTANCE](images/step7.3.png)
 
 ### Validation
 
@@ -415,6 +468,8 @@ FortiGate-VM has a permanent **evaluation** VM license limited to 1 CPUs and 2 G
 
    - Click **OK** and then confirm the system reboot. FortiGate will contact the FortiCare service via its `port1` Internet path — activation typically completes in 30–60 seconds
 
+   ![FORTIFLEX](images/step8.4.png)
+
 5. **Verify the licence:**
    - After the reboot, login to FortiGate again.
    - Go through the FortiGate Setup process.
@@ -422,6 +477,8 @@ FortiGate-VM has a permanent **evaluation** VM license limited to 1 CPUs and 2 G
    - Confirm **VM licence**: `Valid`
    - Confirm **Support contract**: `Valid`
    - Confirm **IPS, Advanced Malware Protection, URL, DNS & Video Filtering**: all show `Licensed` and `Up to date`
+
+   ![LICENSES](images/step8.5.png)
 
 6. **Confirm interface state:**
    - In the FortiGate GUI left navigation menu, click **Network → Interfaces**
@@ -431,6 +488,12 @@ FortiGate-VM has a permanent **evaluation** VM license limited to 1 CPUs and 2 G
      | --- | --- |
      | `port1` | `Up`, IP `10.100.1.x/24` (DHCP from VPC) |
      | `port2` | `Up`, IP `10.100.2.4/24` (DHCP from VPC, resolves to the static reservation) |
+
+     ![INTERFACES](images/step8.6.a.png)
+
+   - `port2` may not be configured correctly. If this is the case, configure a static IP address of `10.100.2.4/24` on port2
+
+     ![CONFIG PORT2](images/step8.6.b.png)
 
 > [!TIP]
 > AWS does not surface the Elastic IP inside the FortiGate OS — `port1` will show the **private** `10.100.1.x` address. The public Elastic IP is provided by the IGW via 1:1 NAT, transparent to the appliance.
@@ -459,16 +522,21 @@ This is the route table that turns FortiGate into the inspection point for `Priv
 
 1. **Create the route table:**
    - In the VPC console left navigation menu under **Virtual private cloud**, click **Route tables**
+
+     ![ROUTE TABLES](images/step9.1.png)
+
    - Click **Create route table** and use the parameters below.
 
      | Parameter | Value |
      | --- | --- |
      | Name | `Redwood-AWS-RT-Private` |
      | VPC | `Redwood-AWS-VPC` |
-     | Tags |
+     | Tags | |
      | `Project` | `Redwood-AWS-101` |
 
    - Click **Create route table**
+
+     ![CREATE ROUTE TABLE](images/step9.1.b.png)
 
 2. **Add the default route to FortiGate `port2`:**
    - Open the new `Redwood-AWS-RT-Private` route table
@@ -482,6 +550,8 @@ This is the route table that turns FortiGate into the inspection point for `Priv
 
    - Click **Save changes**
 
+   ![ADD ROUTE](images/step9.2.png)
+
 > [!IMPORTANT]
 > The target is the **ENI**, not an IP address or instance. AWS console will show the ENI's interface ID (`eni-xxxxxxxxxxxxxxxxx`) and its private IP `10.100.2.4`. If you select an IP target instead, the route will resolve incorrectly when the instance is replaced.
 
@@ -494,6 +564,8 @@ This is the route table that turns FortiGate into the inspection point for `Priv
      | Subnets to associate | `Private-Subnet` (`10.100.2.0/24`) |
 
    - Click **Save associations**
+
+   ![SUBNET ASSOCIATION](images/step9.3.gif)
 
 ### Validation
 
@@ -511,34 +583,7 @@ You have now deployed and configured the security appliance for Redwood Industri
 
 Current state after Lab 2:
 
-```text
-                      ┌────────────────────┐
-                      │      Internet      │
-                      └──────────┬─────────┘
-                                 │
-                      ┌──────────┴─────────┐
-                      │  Redwood-AWS-IGW   │
-                      └──────────┬─────────┘
-                                 │
-                  (RT-Public: 0/0 → IGW)
-                                 │
-┌────────────────────────────────┴───────────────────────────────────┐
-│  Redwood-AWS-VPC  (10.100.0.0/16)  —  ca-central-1a                │
-│                                                                    │
-│  ┌─────────────── Public-Subnet (10.100.1.0/24) ────────────────┐  │
-│  │   Redwood-AWS-FGT  port1 ENI  ──── EIP (15.x.x.x)            │  │
-│  └──────────────────────────────────────────────────────────────┘  │
-│                              ▲                                     │
-│                              │ (FortiOS internal routing)          │
-│                              ▼                                     │
-│  ┌─────────────── Private-Subnet (10.100.2.0/24) ───────────────┐  │
-│  │   Redwood-AWS-FGT  port2 ENI  10.100.2.4 (static)            │  │
-│  │              ▲                                               │  │
-│  │              │  (RT-Private: 0/0 → port2 ENI)                │  │
-│  │   [empty — Lab 3 will deploy a test workload here]           │  │
-│  └──────────────────────────────────────────────────────────────┘  │
-└────────────────────────────────────────────────────────────────────┘
-```
+![REFERENCE ARCHITECTURE LAB 2](images/reference-architecture-lab2.png)
 
 ### Key Takeaways
 
@@ -583,7 +628,7 @@ Ready for [***Lab 3 — Security Policies & Traffic Testing***](/aws-101-lab3/RE
 
 In Lab 3 you will:
 
-- Deploy a test workload (Amazon Linux EC2) in `Private-Subnet`
+- Deploy a test workload (Ubuntu Server 24.04 LTS) in `Private-Subnet`
 - Create FortiGate firewall policies to allow inspected outbound Internet access (with NAT)
 - Create a Virtual IP (VIP) and policy to expose SSH on the test workload through FortiGate's Elastic IP
 - Generate test traffic and watch it appear in **FortiView → Sources** and **Log & Report → Forward Traffic**
