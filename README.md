@@ -40,7 +40,7 @@ The estimated time to complete this workshop is 3 hours.
 
 After completing this bootcamp, you will have deployed the following architecture.
 
-![reference-architecture](aws-101-lab4/images/final_architecture.png)
+![reference-architecture](aws-101-lab4/images/reference-architecture-final.png)
 
 ## Laboratories
 

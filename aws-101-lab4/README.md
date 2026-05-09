@@ -283,8 +283,7 @@ The FortiGate VPN Wizard generates the tunnel interface, the Phase 1 / Phase 2 s
      | NAT Traversal | `Enable` |
      | Keepalive frequency | 10 |
 
-   > [!IMPORTANT]
-   > In production, PSKs should be random (minimum 20 characters, full ASCII entropy), and consider certificate-based authentication as the preferred IKEv2 method per AWS and Fortinet best practices.
+     > In production, PSKs should be random (minimum 20 characters, full ASCII entropy), and consider certificate-based authentication as the preferred IKEv2 method per AWS and Fortinet best practices.
 
    - Click **Next**
 
@@ -304,6 +303,8 @@ The FortiGate VPN Wizard generates the tunnel interface, the Phase 1 / Phase 2 s
 
    - Click **Next**
 
+   ![REMOTE SITE](images/step3.3.png)
+
 4. **Local Site:**
    - Use the parameters below.
 
@@ -317,19 +318,23 @@ The FortiGate VPN Wizard generates the tunnel interface, the Phase 1 / Phase 2 s
 
    - Click **Next**
 
+   ![LOCAL SITE](images/step3.4.png)
+
 5. **Review**
 
    - Review the what the wizard will build
    - Click **Submit**
 
+   ![REVIEW](images/step3.5.png)
+
 6. **Verify what the wizard built:**
-   - Navigate to **VPN → IPsec Tunnels** — confirm `to_aws` is listed with status **Inactive** (Phase 1 cannot complete until the AWS side is configured)
+   - Navigate to **VPN → VPN Tunnels** — confirm `to_aws` is listed with status **Inactive** (Phase 1 cannot complete until the AWS side is configured)
    - Navigate to **Network → Static Routes** — confirm a route for `10.100.0.0/16` via the `to_aws` interface
    - Navigate to **Policy & Objects → Firewall Policy** — confirm two new policies: one for `port2 → to_aws` (outbound to AWS) and one for `to_aws → port2` (inbound from AWS)
 
 ### Validation
 
-- [x] `to_aws` appears under **VPN → IPsec Tunnels**
+- [x] `to_aws` appears under **VPN → VPN Tunnels**
 - [x] Static route to `10.100.0.0/16` via `to_aws` interface exists
 - [x] Two firewall policies exist for traffic between `port2` and the `to_aws` tunnel interface
 - [x] Tunnel status is **Inactive** (expected — the AWS side is not yet configured)
@@ -370,8 +375,7 @@ Now mirror the configuration on the AWS FortiGate. Same wizard, swapped local an
      | NAT Traversal | `Enable` |
      | Keepalive frequency | 10 |
 
-> [!IMPORTANT]
-> In production, PSKs should be random (minimum 20 characters, full ASCII entropy), and consider certificate-based authentication as the preferred IKEv2 method per AWS and Fortinet best practices.
+     > In production, PSKs should be random (minimum 20 characters, full ASCII entropy), and consider certificate-based authentication as the preferred IKEv2 method per AWS and Fortinet best practices.
 
    - Click **Next**
 
@@ -407,14 +411,18 @@ Now mirror the configuration on the AWS FortiGate. Same wizard, swapped local an
    - Review the what the wizard will build
    - Click **Submit**
 
+   ![REVIEW AWS](images/step4.5.png)
+
 7. **Verify what the wizard built (mirror of the on-prem side):**
-   - **VPN → IPsec Tunnels** — `to_on_prem` should appear; within ~30 seconds Phase 1 and Phase 2 should both come up
+   - **VPN → VPN Tunnels** — `to_on_prem` should appear; within ~30 seconds Phase 1 and Phase 2 should both come up
    - **Network → Static Routes** — route for `192.168.0.0/22` via the `to_on_prem` interface
    - **Policy & Objects → Firewall Policy** — two new policies for `port2 ↔ to_on_prem`
 
+   ![VERIFICATION](images/step4.7.png)
+
 ### Validation
 
-- [x] `to_on_prem` appears under **VPN → IPsec Tunnels** with status **Up** (green)
+- [x] `to_on_prem` appears under **VPN → VPN Tunnels** with status **Up** (green)
 - [x] Static route to `192.168.0.0/22` via `to_on_prem` interface exists
 - [x] Two firewall policies exist for `port2 ↔ to_on_prem`
 
@@ -440,9 +448,13 @@ Configuration is now symmetric on both sides. The IKE Phase 1 negotiation should
      | Remote Gateway | `<on-prem-public-ip>` |
      | Tunnel uptime | non-zero minutes ago |
 
+   ![TO_ON_PREM](images/step5.1.png)
+
 2. **On-prem FortiGate — confirm `to_aws`:**
    - In the on-prem FortiGate GUI, navigate to **Dashboard → Network → IPsec** widget
    - Confirm `to_aws` shows the same indicators (mirror values)
+
+   ![TO_AWS](images/step5.2.png)
 
 3. **CLI sanity check (optional) on AWS side :**
 
@@ -500,6 +512,8 @@ We'll test connectivity from the on-premises Windows VM to the Redwood-AWS.
    TcpTestSucceeded : True
    ```
 
+   ![POWERSHELL](images/step6.1.3.png)
+
 ### Validation
 
 - [x] Test-NetConnection succeeds (TcpTestSucceeded: True)
@@ -548,8 +562,8 @@ Now test the reverse direction.
 - Navigate to **Policy & Objects → Firewall Policy**
 - Look for auto-created VPN policies
 - Verify policies exist:
-  - port2 → to_aws (outbound)
-  - to_aws → port2 (inbound)
+  - `port2 → to_aws` (outbound)
+  - `to_aws → port2` (inbound)
 - Source: 192.168.0.0/22, Destination: 10.100.0.0/16
 - Action: ACCEPT, Status: Enabled
 
@@ -557,17 +571,17 @@ Now test the reverse direction.
 
 - Navigate to **Policy & Objects → Firewall Policy**
 - Verify policies exist:
-  - port2 → to_on_prem (outbound)
-  - to_on_prem → port2 (inbound)
+  - `port2 → to_on_prem` (outbound)
+  - `to_on_prem → port2` (inbound)
 - Source: 10.100.0.0/16, Destination: 192.168.0.0/22
 - Action: ACCEPT, Status: Enabled
 
 **Check 4: Routing:**
 
 - **On-Prem FortiGate**: Navigate to **Dashboard → Routing**
-- Verify route to 10.100.0.0/16 via to_aws interface
+- Verify route to `10.100.0.0/16` via `to_aws` interface
 - **Redwood-AWS-FGT** FortiGate: Navigate to **Dashboard → Routing**
-- Verify route to 192.168.0.0/22 via to_on_prem interface
+- Verify route to `192.168.0.0/22` via `to_on_prem` interface
 
 **Check 5: Use FortiGate Packet Capture:**
 
@@ -586,32 +600,7 @@ Redwood Industries now has a working hybrid network — encrypted, inspected, an
 
 ### Architecture Review
 
-```text
-End-to-end traffic flow (AWS → on-prem):
-
-  Redwood-AWS-TestVM (10.100.2.10)
-         │
-         ▼  AWS RT-Private: 0.0.0.0/0 → port2 ENI
-  Redwood-AWS-FGT  port2 (10.100.2.4)
-         │
-         ▼  Routing: 192.168.0.0/22 → to_on_prem (tunnel interface)
-  Redwood-AWS-FGT  IPsec engine: encrypt with PSK, IKEv2, AES-256
-         │
-         ▼  Outgoing on port1 (10.100.1.x)
-  Redwood-AWS-IGW  (1:1 NAT to EIP)
-         │
-         ▼  ESP over UDP/4500 (NAT-T)
-  Internet
-         │
-         ▼
-  On-prem edge → On-prem FortiGate port1 (<on-prem-public-ip>)
-         │
-         ▼  IPsec engine: decrypt, forward
-  On-prem FortiGate port2 (192.168.2.10)
-         │
-         ▼  Routing: 192.168.0.0/22 → local
-  On-prem host (192.168.x.x)
-```
+![REFERENCE ARCHITECTURE](images/reference-architecture-final.png)
 
 ### Key Takeaways
 
@@ -699,13 +688,14 @@ When you're done, the tag-based AWS Resource Group makes clean-up trivial:
 
 1. **AWS Resource groups → Resources → Saved Resource Groups →`Redwood-AWS-RG`** — confirm every resource you created shows up here (filtered by `Project=Redwood-AWS-101`)
 2. Terminate the FortiGate and Test VM EC2 instances
-3. Release the Elastic IP (`Redwood-AWS-FGT-EIP`)
-4. Delete `Redwood-AWS-FGT-port2` ENI, the security groups, the route tables, the IGW (after detaching), the subnets, and the VPC
-5. Delete the Resource Group itself
+3. Release the Elastic IP `Redwood-AWS-FGT-EIP`
+4. Delete `Redwood-AWS-FGT-port2` ENI, the security groups, and the key pair
+5. Go to VPN and delete the VPC `Redwood-AWS-VPC` (deleting the VPC will also delete the subnets, route tables and the IGW.
+6. Delete the Resource Group itself.
 
 **Optionally:**
 
-6. On the on-prem FortiGate, remove the `to_aws` tunnel and its auto-created policies/routes
+7. On the on-prem FortiGate, remove the `to_aws` tunnel and its auto-created policies/routes
 
 ---
 
