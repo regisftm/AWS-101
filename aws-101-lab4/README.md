@@ -18,34 +18,7 @@ By the end of this lab, the test workload from Lab 3 (`Redwood-AWS-TestVM` at `1
 
 ### Architecture After Lab 4
 
-```text
-                          ┌────────────────────────────┐
-                          │          Internet          │
-                          └──┬──────────────────────┬──┘
-                             │                      │
-                             │  IPsec ESP over      │
-                             │  UDP/4500 (NAT-T)    │
-                             │                      │
-              ┌──────────────┴──┐               ┌───┴────────────┐
-              │ Redwood-AWS-IGW │               │  On-prem edge  │
-              │ (1:1 NAT → EIP) │               │  router        │
-              └──────────────┬──┘               └───┬────────────┘
-                             │                      │
-   ┌─────────────────────────┴──────────┐    ┌──────┴───────────────────────┐
-   │  Redwood-AWS-FGT                   │    │  On-Premises FortiGate       │
-   │  port1: 10.100.1.x                 │════│  port1: <on-prem-public-ip>  │
-   │  EIP:   <Redwood-AWS-FGT-EIP>      │    │                              │
-   │                                    │    │                              │
-   │  Tunnel: to_on_prem (IPsec IKEv2)  │    │  Tunnel: to_aws (IPsec IKEv2)│
-   │  port2:  10.100.2.4 (static)       │    │  port2:  192.168.2.4         │
-   └─────────────────────────┬──────────┘    └──────┬───────────────────────┘
-                             │                      │
-   ┌─────────────────────────┴──────────┐    ┌──────┴───────────────────────┐
-   │  Private-Subnet (10.100.2.0/24)   │    │  On-Prem Network             │
-   │                                    │    │  (192.168.0.0/22)            │
-   │  Redwood-AWS-TestVM   10.100.2.10  │    │  On-prem test host           │
-   └────────────────────────────────────┘    └──────────────────────────────┘
-```
+![REFERENCE ARCHITECTURE](images/reference-architecture-final.png)
 
 ### Business Context
 
@@ -65,6 +38,114 @@ A FortiGate-to-FortiGate IPsec VPN is the cheapest way to achieve this: no AWS V
 
 > [!IMPORTANT]
 > **NAT Traversal (NAT-T) is mandatory on the AWS side.** The AWS FortiGate's `port1` interface holds a private VPC address (`10.100.1.x`). The Elastic IP exists at the Internet Gateway and is applied via 1:1 NAT downstream of FortiGate. Without NAT-T, IKE will detect the NAT mid-path and ESP traffic will be silently dropped. NAT-T encapsulates ESP in UDP/4500, which traverses the IGW correctly.
+
+<details>
+
+<summary> :books: NAT Traversal (NAT-T) and ESP — Deep Dive</summary>
+
+### The Problem: ESP and NAT Don't Mix
+
+IPsec in transport/tunnel mode uses **ESP (Encapsulating Security Payload)** — IP protocol number 50. ESP is a Layer 3 protocol, sitting directly on top of IP, with no port numbers. It looks like this:
+
+```text
+[ IP Header | ESP Header | Encrypted Payload | ESP Trailer | ESP Auth ]
+```
+
+This creates a fundamental conflict with NAT:
+
+- NAT devices work by rewriting **IP addresses and port numbers** in packet headers
+- ESP has **no port numbers** — so a NAT device can't build a translation table entry for it
+- Worse, ESP **cryptographically signs the payload** — if a NAT device rewrites the source IP in the outer IP header, the IKE integrity check on the other end detects the modification and **drops the packet**
+
+So a standard NAT device in the path between two IPsec peers will either silently drop ESP packets or corrupt them.
+
+---
+
+### IKE's NAT Detection Mechanism
+
+Before the tunnel comes up, IKE (the key exchange protocol) runs a built-in NAT detection exchange during **Phase 1**. Both peers send hashes of their own IP:port combination. Each side compares what it received against what it computed locally:
+
+```text
+Peer A sends:  hash(my_IP, my_port)
+Peer B receives it and computes: hash(source_IP_it_sees, source_port_it_sees)
+
+If they don't match → NAT is detected in the path
+```
+
+In the AWS lab, the on-prem FortiGate sends IKE from its public IP. The AWS FortiGate receives it at `port1` (`10.100.1.x`) — but the outer IP header shows the on-prem public IP as source. On the AWS side, `port1` holds `10.100.1.x` while the Elastic IP is at the IGW. So when the on-prem peer hashes what it thinks the AWS peer's address is (the EIP) vs. what the IKE packet actually arrives with (`10.100.1.x`), the hashes don't match — **NAT detected**.
+
+---
+
+### The Fix: NAT-T (RFC 3948)
+
+NAT-T solves this by **wrapping ESP inside UDP**:
+
+```text
+Without NAT-T:
+[ IP Header | ESP Header | Encrypted Payload ]
+                ↑ protocol 50, no ports, NAT breaks this
+
+With NAT-T:
+[ IP Header | UDP Header (port 4500) | NAT-T marker | ESP Header | Encrypted Payload ]
+                         ↑ now has ports, NAT can track this
+```
+
+The UDP wrapper gives NAT devices something to work with — source and destination ports — so translation tables can be built and maintained. The ESP payload inside is untouched, so the cryptographic integrity check still passes.
+
+**Port 4500** is the IANA-assigned port for NAT-T. IKE itself moves from UDP/500 to UDP/4500 as well once NAT is detected, so both Phase 1 completion and Phase 2 happen over UDP/4500 when NAT-T is active.
+
+---
+
+### Why This Is Mandatory in the AWS Architecture
+
+```text
+On-prem FortiGate          Internet          AWS IGW              AWS FortiGate
+(public IP: x.x.x.x)  ──────────────────►  (EIP: y.y.y.y)  ──►  port1: 10.100.1.x
+```
+
+The IGW performs 1:1 NAT between the EIP and `port1`'s private IP. From the on-prem peer's perspective, it is talking to `y.y.y.y` (the EIP). But the AWS FortiGate's `port1` only sees `10.100.1.x` — it has no awareness of the EIP. This is a NAT in the path by definition.
+
+Without NAT-T:
+
+- IKE Phase 1 might complete (IKE uses UDP/500, which NAT can handle)
+- But Phase 2 would try to switch to ESP (protocol 50)
+- The IGW can't translate ESP — it has no port numbers to track
+- ESP packets are dropped silently at the IGW
+- The tunnel appears to come up (Phase 1 green) but **passes zero traffic**
+
+With NAT-T:
+
+- IKE detects the NAT during Phase 1
+- Both sides agree to encapsulate ESP in UDP/4500
+- The IGW sees normal UDP traffic, translates it via the EIP, forwards it
+- The AWS FortiGate receives UDP/4500, strips the UDP wrapper, processes ESP normally
+- Tunnel comes up and passes traffic correctly
+
+---
+
+### The Keepalive Dimension
+
+NAT devices maintain translation table entries based on traffic activity. If a UDP/4500 flow goes idle (no packets for ~30 seconds on many NAT devices), the entry is purged. The next ESP packet arrives at the NAT device with no translation entry and gets dropped — causing the tunnel to appear to drop randomly under low-traffic conditions.
+
+NAT-T solves this with **DPD (Dead Peer Detection) keepalives** — small UDP/4500 packets sent periodically (every 10 seconds in the lab) to keep the NAT translation entry alive, even when no user traffic is flowing.
+
+This is why the lab explicitly sets `Keepalive frequency: 10` seconds. AWS's IGW NAT table timeout is not publicly documented but is known to be short — 10 seconds is conservative and safe.
+
+---
+
+### Quick Reference
+
+| Concept | Detail |
+|---|---|
+| ESP | IP protocol 50 — no ports, encrypts+authenticates payload |
+| IKE Phase 1 | UDP/500 — negotiates keys, detects NAT |
+| IKE Phase 2 | Negotiates SAs for the actual tunnel |
+| NAT-T trigger | IKE NAT detection hash mismatch |
+| NAT-T encapsulation | ESP wrapped in UDP/4500 |
+| DPD keepalive | Periodic UDP/4500 to prevent NAT table expiry |
+| AWS IGW role | 1:1 NAT between EIP and port1 private IP — makes NAT-T mandatory |
+
+</details>
 
 ---
 
