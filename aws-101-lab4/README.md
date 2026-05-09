@@ -136,7 +136,7 @@ This is why the lab explicitly sets `Keepalive frequency: 10` seconds. AWS's IGW
 ### Quick Reference
 
 | Concept | Detail |
-|---|---|
+| --- | --- |
 | ESP | IP protocol 50 — no ports, encrypts+authenticates payload |
 | IKE Phase 1 | UDP/500 — negotiates keys, detects NAT |
 | IKE Phase 2 | Negotiates SAs for the actual tunnel |
@@ -205,6 +205,8 @@ In Lab 2 you created `Redwood-AWS-FGT-SG` with rules for `HTTPS` (443), `SSH` (2
    - In the left navigation menu under **Network & Security**, click **Security Groups**
    - Select `Redwood-AWS-FGT-SG`
 
+   ![SECURITY GROUPS](images/step1.1.png)
+
 2. **Edit inbound rules:**
    - Click **Inbound rules → Edit inbound rules**
    - Click **Add rule** twice — add the two rules below.
@@ -215,6 +217,8 @@ In Lab 2 you created `Redwood-AWS-FGT-SG` with rules for `HTTPS` (443), `SSH` (2
      | Custom UDP | UDP | 4500 | Custom | `<on-prem-public-ip>/32` | IPsec NAT-T (ESP over UDP) from on-prem FortiGate |
 
    - Click **Save rules**
+
+   ![SECURITY GROUPS RULES](images/step1.2.png)
 
 > [!TIP]
 > Pin the source CIDR to the on-prem FortiGate's `/32` rather than `0.0.0.0/0`. IKE/NAT-T endpoints exposed to the open Internet attract probing within minutes; restricting to the known peer is a free hardening measure.
@@ -264,6 +268,8 @@ The FortiGate VPN Wizard generates the tunnel interface, the Phase 1 / Phase 2 s
 
    - Click **Begin**
 
+   ![VPN WIZ](images/step3.1.png)
+
 2. **VPN Tunnel:**
 
    - Use the parameters below.
@@ -277,10 +283,12 @@ The FortiGate VPN Wizard generates the tunnel interface, the Phase 1 / Phase 2 s
      | NAT Traversal | `Enable` |
      | Keepalive frequency | 10 |
 
-> [!IMPORTANT]
-> In production, PSKs should be random (minimum 20 characters, full ASCII entropy), and consider certificate-based authentication as the preferred IKEv2 method per AWS and Fortinet best practices.
+   > [!IMPORTANT]
+   > In production, PSKs should be random (minimum 20 characters, full ASCII entropy), and consider certificate-based authentication as the preferred IKEv2 method per AWS and Fortinet best practices.
 
    - Click **Next**
+
+   ![VPN TUNNEL](images/step3.2.png)
 
 3. **Remote Site:**
 
