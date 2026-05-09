@@ -628,7 +628,7 @@ Ready for [***Lab 3 — Security Policies & Traffic Testing***](/aws-101-lab3/RE
 
 In Lab 3 you will:
 
-- Deploy a test workload (Ubuntu Server 24.04 LTS) in `Private-Subnet`
+- Deploy a test workload (Ubuntu Server 26.04 LTS) in `Private-Subnet`
 - Create FortiGate firewall policies to allow inspected outbound Internet access (with NAT)
 - Create a Virtual IP (VIP) and policy to expose SSH on the test workload through FortiGate's Elastic IP
 - Generate test traffic and watch it appear in **FortiView → Sources** and **Log & Report → Forward Traffic**
